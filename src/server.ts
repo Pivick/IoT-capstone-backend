@@ -47,20 +47,17 @@ app.get("/", (_req, res) => {
   res.send("UniVentry Backend Running");
 });
 
-// 🔥 START THE MONITOR
-startOverstayMonitor();
-
 // 3. DATABASE & SERVER START
 const startServer = async () => {
   try {
     await connectDB();
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📁 Office Registry: http://localhost:${PORT}/api/offices`);
-      console.log(
-        `📊 Slot System: http://localhost:${PORT}/api/bookings/slots`,
-      );
+    startOverstayMonitor();
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on ${PORT}`);
+      console.log(`📁 Office Registry: ${PORT}/api/offices`);
+      console.log(`📊 Slot System: ${PORT}/api/bookings/slots`);
       initSurveillanceGrid();
     });
   } catch (err) {
