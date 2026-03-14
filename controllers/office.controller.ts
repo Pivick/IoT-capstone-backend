@@ -56,32 +56,47 @@ export const deleteOffice = async (req: Request, res: Response) => {
 // 🔥 FIX 2: Optimized getAvailableSlots for bookingDate
 export const getAvailableSlots = async (req: Request, res: Response) => {
   try {
-    const { date, office } = req.query;
+    const date =
+      typeof req.query.date === "string"
+        ? req.query.date.trim()
+        : typeof req.query.bookingDate === "string"
+          ? req.query.bookingDate.trim()
+          : "";
+
+    const office =
+      typeof req.query.office === "string" ? req.query.office.trim() : "";
 
     console.log("📊 Capacity Query:", req.query);
 
     if (!date || !office) {
       return res.status(400).json({
         error: "Date and office are required",
+        received: {
+          date: req.query.date ?? null,
+          bookingDate: req.query.bookingDate ?? null,
+          office: req.query.office ?? null,
+        },
       });
     }
 
-    const officeDoc = await Office.findOne({ name: office as string });
+    const officeDoc = await Office.findOne({ name: office });
 
     if (!officeDoc) {
       return res.status(404).json({ error: "Office not found" });
     }
 
     const override = officeDoc.customLimits?.find(
-      (cl: any) => cl.date === date,
+      (cl: any) => String(cl.date).trim() === date,
     );
 
     const maxSlots =
-      override !== undefined ? override.limit : officeDoc.defaultMaxSlots;
+      override && typeof override.limit === "number"
+        ? override.limit
+        : officeDoc.defaultMaxSlots;
 
     const count = await Booking.countDocuments({
       bookingDate: date,
-      office: office as string,
+      office,
       status: { $nin: ["Rejected", "Cancelled"] },
     });
 

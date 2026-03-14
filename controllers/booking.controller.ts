@@ -92,38 +92,58 @@ export const verifyOTP = (req: Request, res: Response) => {
 // ---------------------------------------------------------
 export const getSlots = async (req: Request, res: Response) => {
   try {
-    const { bookingDate, office: officeName } = req.query;
-    const queryDate = (bookingDate as string) || (req.query.date as string);
+    const bookingDate =
+      typeof req.query.bookingDate === "string"
+        ? req.query.bookingDate.trim()
+        : typeof req.query.date === "string"
+          ? req.query.date.trim()
+          : "";
 
-    if (!queryDate || !officeName) {
-      return res
-        .status(400)
-        .json({ error: "Date and Office parameters are required" });
+    const officeName =
+      typeof req.query.office === "string" ? req.query.office.trim() : "";
+
+    if (!bookingDate || !officeName) {
+      return res.status(400).json({
+        error: "Date and office parameters are required",
+        received: {
+          bookingDate: req.query.bookingDate ?? null,
+          date: req.query.date ?? null,
+          office: req.query.office ?? null,
+        },
+      });
     }
 
-    const officeDoc = await Office.findOne({ name: officeName as string });
+    const officeDoc = await Office.findOne({ name: officeName });
+
     if (!officeDoc) {
       return res.status(404).json({ error: "Office not found" });
     }
 
-    const override = officeDoc.customLimits.find(
-      (cl: any) => cl.date === queryDate,
+    const override = officeDoc.customLimits?.find(
+      (cl: any) => String(cl.date).trim() === bookingDate,
     );
+
     const maxSlots =
-      override !== undefined ? override.limit : officeDoc.defaultMaxSlots;
+      override && typeof override.limit === "number"
+        ? override.limit
+        : officeDoc.defaultMaxSlots;
 
     const count = await Booking.countDocuments({
-      bookingDate: queryDate,
-      office: officeName as string,
+      bookingDate,
+      office: officeName,
       status: { $nin: ["Rejected", "Cancelled"] },
     });
 
-    return res.status(200).json({ current: count, max: maxSlots });
+    return res.status(200).json({
+      current: count,
+      max: maxSlots,
+    });
   } catch (error: any) {
-    console.error("❌ Slot Fetch Error:", error.message);
-    return res
-      .status(500)
-      .json({ error: "Internal server error syncing slots." });
+    console.error("❌ Slot Fetch Error:", error);
+    return res.status(500).json({
+      error: "Internal server error syncing slots.",
+      details: error?.message || "Unknown error",
+    });
   }
 };
 
