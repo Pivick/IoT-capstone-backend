@@ -55,47 +55,44 @@ export const deleteOffice = async (req: Request, res: Response) => {
 
 // 🔥 FIX 2: Optimized getAvailableSlots for bookingDate
 export const getAvailableSlots = async (req: Request, res: Response) => {
-  // 🔥 CHANGE 1: Accept bookingDate from frontend query
-  const bookingDate = req.query.bookingDate as string;
-  const officeName = req.query.office as string;
-
-  if (!bookingDate || !officeName) {
-    return res
-      .status(400)
-      .json({ message: "Booking Date and Office are required" });
-  }
-
   try {
-    // 1. Find the office settings
-    const officeDoc = await Office.findOne({ name: officeName });
-    if (!officeDoc)
-      return res.status(404).json({ message: "Office not found" });
+    const { date, office } = req.query;
 
-    // 2. LOGIC: Check for date-specific override
-    // Note: officeDoc.customLimits likely still uses 'date' property, which is fine.
-    // We compare it against our incoming 'bookingDate'.
-    const override = officeDoc.customLimits.find(
-      (cl: any) => cl.date === bookingDate,
+    console.log("📊 Capacity Query:", req.query);
+
+    if (!date || !office) {
+      return res.status(400).json({
+        error: "Date and office are required",
+      });
+    }
+
+    const officeDoc = await Office.findOne({ name: office as string });
+
+    if (!officeDoc) {
+      return res.status(404).json({ error: "Office not found" });
+    }
+
+    const override = officeDoc.customLimits?.find(
+      (cl: any) => cl.date === date,
     );
 
-    // 3. Determine Max Slots (Override vs Default)
     const maxSlots =
       override !== undefined ? override.limit : officeDoc.defaultMaxSlots;
 
-    // 4. Count current bookings
-    // 🔥 CHANGE 2: Use 'bookingDate' to query the Booking Collection
-    const currentBookings = await Booking.countDocuments({
-      office: officeName,
-      bookingDate: bookingDate,
-      status: { $nin: ["Rejected", "Cancelled"] }, // Exclude invalid bookings
+    const count = await Booking.countDocuments({
+      bookingDate: date,
+      office: office as string,
+      status: { $nin: ["Rejected", "Cancelled"] },
     });
 
-    res.json({
-      current: currentBookings,
+    console.log("📊 Capacity Result:", { current: count, max: maxSlots });
+
+    return res.status(200).json({
+      current: count,
       max: maxSlots,
     });
-  } catch (error) {
-    console.error("Slot Error:", error);
-    res.status(500).json({ message: "Server Error" });
+  } catch (error: any) {
+    console.error("❌ Capacity Error:", error.message);
+    return res.status(500).json({ error: "Failed to fetch capacity" });
   }
 };
