@@ -418,10 +418,49 @@ export const getAllBookings = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const bookings = await Booking.find().sort({ createdAt: -1 });
-    res.status(200).json(bookings);
+    // 🔥 THE FIX: Exclude heavy Base64 images so the table loads instantly
+    const bookings = await Booking.find()
+      .select("-idFront -idBack -faceEmbedding")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Map through and calculate the hours just like the audit trail needs
+    const auditLogs = bookings.map((log: any) => {
+      let calculatedHours = 0;
+      if (log.timeIn && log.timeOut) {
+        calculatedHours =
+          (new Date(log.timeOut).getTime() - new Date(log.timeIn).getTime()) /
+          36e5;
+      } else if (log.timeIn && !log.timeOut) {
+        calculatedHours = (Date.now() - new Date(log.timeIn).getTime()) / 36e5;
+      }
+
+      return {
+        ...log,
+        bookingDate:
+          log.bookingDate || log.date || new Date().toISOString().split("T")[0],
+        hours: calculatedHours,
+        actionBy: log.actionBy || "SYSTEM",
+      };
+    });
+
+    res.status(200).json(auditLogs);
   } catch (error) {
+    console.error("Fetch Bookings Error:", error);
     res.status(500).json({ message: "Failed to fetch booking history" });
+  }
+};
+
+// ---------------------------------------------------------
+// 8. DELETE BOOKING (For the Danger Zone)
+// ---------------------------------------------------------
+export const deleteBooking = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await Booking.findByIdAndDelete(id);
+    res.status(200).json({ message: "Record deleted permanently." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error during deletion." });
   }
 };
 

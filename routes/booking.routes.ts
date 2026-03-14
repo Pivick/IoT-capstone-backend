@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createBooking,
+  deleteBooking,
   getAllBookings,
   getSlots,
   getVisitorDetails,
@@ -18,6 +19,8 @@ router.get("/", getAllBookings);
 
 // 🔥 2. ADD THIS ROUTE (Required for Transaction Scan Preview)
 router.get("/:id", getVisitorDetails);
+// Add this line at the bottom of your routes:
+router.delete("/:id", deleteBooking);
 
 // 🚀 SCANNERS
 router.post("/scan", protect, scanQR);
