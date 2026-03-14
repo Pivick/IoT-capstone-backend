@@ -2,58 +2,171 @@ import dns from "dns";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import QRCode from "qrcode";
-import { Resend } from "resend";
 import Booking from "../model/booking.model";
 import { Office } from "../model/Office";
+import { sendEmail } from "../services/email.service";
 import { sendSMS } from "../services/sms.service";
 
 dns.setDefaultResultOrder("ipv4first");
 
-const resendApiKey = process.env.RESEND_API_KEY;
-
-if (!resendApiKey) {
-  throw new Error("RESEND_API_KEY is missing from environment variables.");
-}
-
-const resend = new Resend(resendApiKey);
-
-const otpStore: Record<string, string> = {};
-
-// ---------------------------------------------------------
-// 1. SEND OTP
-// ---------------------------------------------------------
-import { sendEmail } from "../services/email.service";
-
-export const sendOTPEmail = async (email: string, otp: string) => {
-  const html = `
-  <div style="font-family: Arial; padding:20px">
-    <h2>UniVentry OTP Verification</h2>
-    <p>Your OTP code is:</p>
-    <h1 style="letter-spacing:5px">${otp}</h1>
-    <p>This code will expire in 5 minutes.</p>
-  </div>
-  `;
-
-  await sendEmail(email, "UniVentry OTP Code", html);
+type OTPEntry = {
+  otp: string;
+  expiresAt: number;
 };
 
-// ---------------------------------------------------------
+const otpStore: Record<string, OTPEntry> = {};
+
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+
+const buildOTPEmailHtml = (otp: string) => `
+  <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b;">
+    <h2 style="margin: 0 0 12px; color: #0038A8;">UniVentry OTP Verification</h2>
+    <p style="margin: 0 0 12px;">Your verification code is:</p>
+    <div style="font-size: 32px; font-weight: 800; letter-spacing: 8px; margin: 16px 0; color: #0038A8;">
+      ${otp}
+    </div>
+    <p style="margin: 0; color: #64748b;">This code will expire in 5 minutes.</p>
+  </div>
+`;
+
+const buildBookingEmailHtml = ({
+  firstName,
+  office,
+  bookingDate,
+  qrCodeDataURL,
+  bookingId,
+}: {
+  firstName: string;
+  office: string;
+  bookingDate: string;
+  qrCodeDataURL: string;
+  bookingId: string;
+}) => `
+  <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
+    <div style="background: #0038A8; padding: 30px; text-align: center;">
+      <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
+      <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">
+        IoT Visitor Management System
+      </p>
+    </div>
+
+    <div style="padding: 40px; text-align: center; color: #1e293b;">
+      <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">
+        Hello, ${firstName}!
+      </h2>
+
+      <p style="font-size: 15px; color: #475569;">
+        Your appointment for <strong>${office}</strong> is
+        <span style="color: #10b981; font-weight: bold;"> Confirmed</span>.
+      </p>
+
+      <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
+        <img
+          src="${qrCodeDataURL}"
+          alt="QR Code"
+          style="width: 200px; height: 200px; display: block; border-radius: 10px;"
+        />
+        <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
+          ID: #${bookingId.slice(-6).toUpperCase()}
+        </p>
+      </div>
+
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
+        Present this QR code at the <strong>Campus Gate</strong> scanner.
+      </p>
+
+      <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
+        <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
+          Valid Date
+        </span>
+        <br />
+        <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
+          ${bookingDate}
+        </span>
+      </div>
+    </div>
+
+    <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="font-size: 11px; color: #64748b; margin: 0;">
+        © ${new Date().getFullYear()} Rizal Technological University Security.
+      </p>
+    </div>
+  </div>
+`;
+
+// 1. SEND OTP
+export const sendOTP = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({ error: "Valid email is required." });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    otpStore[normalizedEmail] = {
+      otp,
+      expiresAt: Date.now() + OTP_EXPIRY_MS,
+    };
+
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "UniVentry OTP Code",
+        htmlContent: buildOTPEmailHtml(otp),
+        textContent: `Your UniVentry OTP code is ${otp}. This code will expire in 5 minutes.`,
+      });
+
+      console.log("✅ OTP email sent to:", normalizedEmail);
+    } catch (mailErr) {
+      console.error("⚠️ OTP email failed:", mailErr);
+      console.log(`⚠️ DEV OTP FALLBACK for ${normalizedEmail}: ${otp}`);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully.",
+    });
+  } catch (error: any) {
+    console.error("❌ sendOTP error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to send OTP.",
+    });
+  }
+};
+
 // 2. VERIFY OTP
-// ---------------------------------------------------------
 export const verifyOTP = (req: Request, res: Response) => {
   const { email, otp } = req.body;
 
-  if (otpStore[email] && otpStore[email] === otp) {
-    delete otpStore[email];
-    return res.status(200).json({ success: true });
+  if (!email || !otp) {
+    return res.status(400).json({ error: "Email and OTP are required." });
   }
 
-  return res.status(400).json({ error: "Invalid or expired protocol code." });
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const entry = otpStore[normalizedEmail];
+
+  if (!entry) {
+    return res.status(400).json({ error: "Invalid or expired OTP." });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    delete otpStore[normalizedEmail];
+    return res.status(400).json({ error: "OTP has expired." });
+  }
+
+  if (entry.otp !== String(otp).trim()) {
+    return res.status(400).json({ error: "Invalid OTP." });
+  }
+
+  delete otpStore[normalizedEmail];
+  return res.status(200).json({ success: true });
 };
 
-// ---------------------------------------------------------
 // 3. GET SLOTS
-// ---------------------------------------------------------
 export const getSlots = async (req: Request, res: Response) => {
   try {
     const bookingDate =
@@ -111,9 +224,7 @@ export const getSlots = async (req: Request, res: Response) => {
   }
 };
 
-// ---------------------------------------------------------
 // 4. CREATE BOOKING
-// ---------------------------------------------------------
 export const createBooking = async (req: Request, res: Response) => {
   try {
     const {
@@ -168,6 +279,7 @@ export const createBooking = async (req: Request, res: Response) => {
     const override = officeDoc.customLimits.find(
       (cl: any) => cl.date === bookingDate,
     );
+
     const maxSlots =
       override !== undefined ? override.limit : officeDoc.defaultMaxSlots;
 
@@ -194,11 +306,11 @@ export const createBooking = async (req: Request, res: Response) => {
     const newBooking = new Booking({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       phoneNumber: phoneNumber || "",
       category: category || "",
       office: office.trim(),
-      purpose: purpose.trim(),
+      purpose: purpose?.trim() || "",
       bookingDate: bookingDate.trim(),
       idCategory,
       idType,
@@ -223,89 +335,41 @@ export const createBooking = async (req: Request, res: Response) => {
       color: { dark: "#000000", light: "#ffffff" },
     });
 
-    res.status(201).json({ success: true, bookingId: saved._id });
-
-    resend.emails
-      .send({
-        from: process.env.RESEND_FROM_EMAIL as string,
-        to: [email],
+    try {
+      await sendEmail({
+        to: saved.email,
         subject: "Appointment Approved - Your Secure Access Pass",
-        html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
-            <div style="background: #0038A8; padding: 30px; text-align: center;">
-              <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
-              <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">
-                IoT Visitor Management System
-              </p>
-            </div>
-
-            <div style="padding: 40px; text-align: center; color: #1e293b;">
-              <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">
-                Hello, ${firstName}!
-              </h2>
-
-              <p style="font-size: 15px; color: #475569;">
-                Your appointment for <strong>${office}</strong> is
-                <span style="color: #10b981; font-weight: bold;">Confirmed</span>.
-              </p>
-
-              <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
-                <img
-                  src="${qrCodeDataURL}"
-                  alt="QR Code"
-                  style="width: 200px; height: 200px; display: block; border-radius: 10px;"
-                />
-
-                <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
-                  ID: #${saved._id.toString().slice(-6).toUpperCase()}
-                </p>
-              </div>
-
-              <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
-                Present this QR code at the <strong>Campus Gate</strong> scanner.
-              </p>
-
-              <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
-                <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
-                  Valid Date
-                </span>
-                <br />
-                <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
-                  ${bookingDate}
-                </span>
-              </div>
-            </div>
-
-            <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="font-size: 11px; color: #64748b; margin: 0;">
-                © ${new Date().getFullYear()} Rizal Technological University Security.
-              </p>
-            </div>
-          </div>
-        `,
-      })
-      .then((result) => {
-        if (result.error) {
-          console.error("⚠️ Booking QR email failed:", result.error);
-        } else {
-          console.log("✅ Booking email sent:", result.data);
-        }
-      })
-      .catch((mailErr) => {
-        console.error("⚠️ Booking QR email failed:", mailErr);
+        htmlContent: buildBookingEmailHtml({
+          firstName: saved.firstName,
+          office: saved.office,
+          bookingDate: saved.bookingDate,
+          qrCodeDataURL,
+          bookingId: saved._id.toString(),
+        }),
+        textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
       });
+
+      console.log("✅ Booking QR email sent to:", saved.email);
+    } catch (mailErr) {
+      console.error("⚠️ Booking QR email failed:", mailErr);
+    }
+
+    return res.status(201).json({
+      success: true,
+      bookingId: saved._id,
+      message: "Booking created successfully.",
+    });
   } catch (error: any) {
     console.error("❌ Booking Error:", error.message);
     return res.status(500).json({
+      success: false,
       error: "Server Error",
       details: error.message,
     });
   }
 };
 
-// ---------------------------------------------------------
-// 5. SCAN QR (GATE IN/OUT) - AUDIT TRAIL
-// ---------------------------------------------------------
+// 5. SCAN QR
 export const scanQR = async (req: Request, res: Response): Promise<void> => {
   try {
     const { qrCode, scanType, guardName: bodyGuardName } = req.body;
@@ -402,9 +466,7 @@ export const scanQR = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// ---------------------------------------------------------
-// 6. SCAN TRANSACTION (OFFICE) - AUDIT TRAIL
-// ---------------------------------------------------------
+// 6. SCAN TRANSACTION
 export const scanTransaction = async (req: Request, res: Response) => {
   const { qrCode } = req.body;
 
@@ -460,9 +522,7 @@ export const scanTransaction = async (req: Request, res: Response) => {
   }
 };
 
-// ---------------------------------------------------------
 // 7. GET ALL BOOKINGS
-// ---------------------------------------------------------
 export const getAllBookings = async (
   req: Request,
   res: Response,
@@ -500,9 +560,7 @@ export const getAllBookings = async (
   }
 };
 
-// ---------------------------------------------------------
 // 8. DELETE BOOKING
-// ---------------------------------------------------------
 export const deleteBooking = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -513,9 +571,7 @@ export const deleteBooking = async (req: Request, res: Response) => {
   }
 };
 
-// ---------------------------------------------------------
 // 9. GET VISITOR DETAILS
-// ---------------------------------------------------------
 export const getVisitorDetails = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
