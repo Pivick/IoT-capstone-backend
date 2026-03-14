@@ -9,7 +9,14 @@ import { sendSMS } from "../services/sms.service";
 
 dns.setDefaultResultOrder("ipv4first");
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+const resendApiKey = process.env.RESEND_API_KEY;
+
+if (!resendApiKey) {
+  throw new Error("RESEND_API_KEY is missing from environment variables.");
+}
+
+const resend = new Resend(resendApiKey);
+
 const otpStore: Record<string, string> = {};
 
 // ---------------------------------------------------------
