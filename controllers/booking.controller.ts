@@ -182,7 +182,7 @@ export const createBooking = async (req: Request, res: Response) => {
       purpose: purpose.trim(),
       bookingDate: bookingDate.trim(),
       idCategory,
-      idType,
+      idType, // 🔥 idType is now guaranteed by the frontend update
       idFront,
       idBack,
       ocrFront,
