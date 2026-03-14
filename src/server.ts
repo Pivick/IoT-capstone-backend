@@ -21,15 +21,10 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", // Local frontend testing
-      "https://univentry-frontend.vercel.app", // Production frontend
+      "http://localhost:5173",
+      "https://univentry-frontend.vercel.app", // Add your Vercel URL here!
     ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "ngrok-skip-browser-warning",
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
   }),
 );
