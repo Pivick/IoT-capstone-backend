@@ -7,6 +7,9 @@ import Booking from "../model/booking.model";
 import { Office } from "../model/Office";
 import { sendSMS } from "../services/sms.service"; // Uncomment if you have this
 
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
 // ---------------------------------------------------------
 // CONFIGURATION & SETUP
 // ---------------------------------------------------------
@@ -23,9 +26,7 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
-  // 🔥 THE RAILWAY FIX: Force Node.js to use IPv4 instead of IPv6!
-  family: 4,
-} as any); // (Added "as any" just in case TypeScript complains about family)
+});
 
 // ---------------------------------------------------------
 // 1. SEND OTP
