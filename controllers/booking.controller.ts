@@ -1,8 +1,8 @@
-/* eslint-disable */
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import nodemailer from "nodemailer";
 import QRCode from "qrcode";
+import { Resend } from "resend";
 import Booking from "../model/booking.model";
 import { Office } from "../model/Office";
 import { sendSMS } from "../services/sms.service"; // Uncomment if you have this
@@ -13,6 +13,8 @@ dns.setDefaultResultOrder("ipv4first");
 // ---------------------------------------------------------
 // CONFIGURATION & SETUP
 // ---------------------------------------------------------
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 const otpStore: Record<string, string> = {};
 
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -38,34 +40,23 @@ const transporter = nodemailer.createTransport({
 // ---------------------------------------------------------
 export const sendOTP = async (req: Request, res: Response) => {
   const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
-  }
+  if (!email) return res.status(400).json({ error: "Email is required" });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   otpStore[email] = otp;
 
   try {
-    await transporter.sendMail({
-      from: `"UniVentry System" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: "UniVentry <onboarding@resend.dev>",
       to: email,
       subject: "Verification Protocol: Your Access Code",
-      text: `Your verification code is ${otp}`,
+      html: `<p>Your security verification code is: <strong>${otp}</strong></p>`,
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "OTP sent successfully",
-    });
+    return res.status(200).json({ success: true, message: "OTP Sent" });
   } catch (error: any) {
-    console.error("❌ Mailer Error:", error.message);
-
-    return res.status(200).json({
-      success: true,
-      message: "OTP generated but email service unavailable",
-      otp,
-    });
+    console.error("❌ Resend OTP Error:", error);
+    return res.status(500).json({ error: "Failed to send email." });
   }
 };
 
@@ -226,60 +217,69 @@ export const createBooking = async (req: Request, res: Response) => {
       color: { dark: "#000000", light: "#ffffff" },
     });
 
-    // E. Send Beautiful Email (YOUR DESIGN)
-    const mailOptions = {
-      from: `"UniVentry Security" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "✅ Appointment Approved - Your Secure Access Pass",
-      html: `
-    <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
-      <div style="background: #0038A8; padding: 30px; text-align: center;">
-        <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
-        <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">IoT Visitor Management System</p>
-      </div>
-      <div style="padding: 40px; text-align: center; color: #1e293b;">
-        <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">Hello, ${firstName}!</h2>
-        <p style="font-size: 15px; color: #475569;">Your appointment for <strong>${office}</strong> is <span style="color: #10b981; font-weight: bold;">Confirmed</span>.</p>
-        <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
-          <img src="cid:qrcode" alt="QR Code" style="width: 200px; height: 200px; display: block; border-radius: 10px;" />
-          <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">ID: #${saved._id.toString().slice(-6).toUpperCase()}</p>
-        </div>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">Present this QR code at the <strong>Campus Gate</strong> scanner.</p>
-        <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
-            <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">Valid Date</span><br>
-            <span style="font-size: 16px; font-weight: 800; color: #1e293b;">${bookingDate}</span>
-        </div>
-      </div>
-      <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-        <p style="font-size: 11px; color: #64748b; margin: 0;">&copy; ${new Date().getFullYear()} Rizal Technological University Security.</p>
-      </div>
-    </div>
-  `,
-      attachments: [
-        {
-          filename: "access-pass.png",
-          content: qrCodeDataURL.split("base64,")[1],
-          encoding: "base64",
-          cid: "qrcode",
-        },
-        {
-          filename: `RTU-Pass-${saved._id.toString().slice(-4)}.png`,
-          content: qrCodeDataURL.split("base64,")[1],
-          encoding: "base64",
-        },
-      ],
-    };
-
-    // 🔥 FIX: Send Success Response to Frontend IMMEDIATELY
+    // Send success response to frontend immediately
     res.status(201).json({ success: true, bookingId: saved._id });
 
-    // 🔥 FIX: Attempt to send email in the background without `await`
-    transporter.sendMail(mailOptions).catch((mailErr) => {
-      console.error("⚠️ Background Mailer Timeout (Ignored):", mailErr.message);
-    });
+    // Send email in background using Resend
+    resend.emails
+      .send({
+        from: "UniVentry <onboarding@resend.dev>",
+        to: email,
+        subject: "✅ Appointment Approved - Your Secure Access Pass",
+        html: `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
+        <div style="background: #0038A8; padding: 30px; text-align: center;">
+          <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
+          <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">IoT Visitor Management System</p>
+        </div>
+
+        <div style="padding: 40px; text-align: center; color: #1e293b;">
+          <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">Hello, ${firstName}!</h2>
+
+          <p style="font-size: 15px; color: #475569;">
+            Your appointment for <strong>${office}</strong> is
+            <span style="color: #10b981; font-weight: bold;">Confirmed</span>.
+          </p>
+
+          <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
+            <img src="${qrCodeDataURL}" alt="QR Code" style="width: 200px; height: 200px; display: block; border-radius: 10px;" />
+
+            <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
+              ID: #${saved._id.toString().slice(-6).toUpperCase()}
+            </p>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
+            Present this QR code at the <strong>Campus Gate</strong> scanner.
+          </p>
+
+          <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
+            <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
+              Valid Date
+            </span>
+            <br>
+            <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
+              ${bookingDate}
+            </span>
+          </div>
+        </div>
+
+        <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 11px; color: #64748b; margin: 0;">
+            © ${new Date().getFullYear()} Rizal Technological University Security.
+          </p>
+        </div>
+      </div>
+    `,
+      })
+      .catch((mailErr) => {
+        console.error("⚠️ Booking QR email failed:", mailErr);
+      });
   } catch (error: any) {
     console.error("❌ Booking Error:", error.message);
-    res.status(500).json({ error: "Server Error", details: error.message });
+    return res
+      .status(500)
+      .json({ error: "Server Error", details: error.message });
   }
 };
 
@@ -499,10 +499,19 @@ export const deleteBooking = async (req: Request, res: Response) => {
 export const getVisitorDetails = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
     const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ message: "Visitor not found" });
-    res.status(200).json(booking);
-  } catch (error) {
-    res.status(500).json({ message: "Server Error fetching visitor details" });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Visitor not found" });
+    }
+
+    return res.status(200).json(booking);
+  } catch (error: any) {
+    console.error("❌ Fetch Visitor Error:", error.message);
+
+    return res.status(500).json({
+      message: "Server Error fetching visitor details",
+    });
   }
 };
