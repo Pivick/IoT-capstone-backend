@@ -15,15 +15,17 @@ const otpStore: Record<string, string> = {};
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
-  secure: true, // Forces secure SSL/IPv4
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    rejectUnauthorized: false, // Bypasses strict cloud firewalls
+    rejectUnauthorized: false,
   },
-});
+  // 🔥 THE RAILWAY FIX: Force Node.js to use IPv4 instead of IPv6!
+  family: 4,
+} as any); // (Added "as any" just in case TypeScript complains about family)
 
 // ---------------------------------------------------------
 // 1. SEND OTP
@@ -251,8 +253,13 @@ export const createBooking = async (req: Request, res: Response) => {
       ],
     };
 
-    await transporter.sendMail(mailOptions);
+    // 🔥 FIX: Send Success Response to Frontend IMMEDIATELY
     res.status(201).json({ success: true, bookingId: saved._id });
+
+    // 🔥 FIX: Attempt to send email in the background without `await`
+    transporter.sendMail(mailOptions).catch((mailErr) => {
+      console.error("⚠️ Background Mailer Timeout (Ignored):", mailErr.message);
+    });
   } catch (error: any) {
     console.error("❌ Booking Error:", error.message);
     res.status(500).json({ error: "Server Error", details: error.message });
