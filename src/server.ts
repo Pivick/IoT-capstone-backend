@@ -9,6 +9,7 @@ import auditRoutes from "../routes/audit.routes";
 import authRoutes from "../routes/auth";
 import bookingRoutes from "../routes/booking.routes";
 import cctvLogRoutes from "../routes/cctvlog.routes";
+import faceRecognitionRoutes from "../routes/faceRecognition.routes";
 import officeRoutes from "../routes/office.routes";
 import streamRoutes from "../routes/stream.routes";
 import userRoutes from "../routes/user.routes";
@@ -61,6 +62,7 @@ app.post("/api/send-otp", sendOTP);
 app.post("/api/verify-otp", verifyOTP);
 app.use("/api/cctv-logs", cctvLogRoutes);
 app.use("/api/stream", streamRoutes);
+app.use("/api", faceRecognitionRoutes);
 
 startOverstayMonitor();
 
