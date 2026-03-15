@@ -33,13 +33,13 @@ const buildBookingEmailHtml = ({
   firstName,
   office,
   bookingDate,
-  qrCodeDataURL,
+  qrCodeImageUrl,
   bookingId,
 }: {
   firstName: string;
   office: string;
   bookingDate: string;
-  qrCodeDataURL: string;
+  qrCodeImageUrl: string;
   bookingId: string;
 }) => `
   <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
@@ -62,7 +62,7 @@ const buildBookingEmailHtml = ({
 
       <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
         <img
-          src="${qrCodeDataURL}"
+          src="${qrCodeImageUrl}"
           alt="QR Code"
           style="width: 200px; height: 200px; display: block; border-radius: 10px;"
         />
@@ -112,22 +112,30 @@ export const sendOTP = async (req: Request, res: Response) => {
     };
 
     try {
-      await sendEmail({
+      const result = await sendEmail({
         to: normalizedEmail,
         subject: "UniVentry OTP Code",
-        htmlContent: buildOTPEmailHtml(otp),
+        htmlContent: `
+          <div style="font-family: Arial, sans-serif; padding: 24px;">
+            <h2>UniVentry OTP Verification</h2>
+            <p>Your verification code is:</p>
+            <h1 style="letter-spacing: 8px;">${otp}</h1>
+            <p>This code will expire in 5 minutes.</p>
+          </div>
+        `,
         textContent: `Your UniVentry OTP code is ${otp}. This code will expire in 5 minutes.`,
       });
 
-      console.log("✅ OTP email sent to:", normalizedEmail);
-    } catch (mailErr) {
-      console.error("⚠️ OTP email failed:", mailErr);
-      console.log(`⚠️ DEV OTP FALLBACK for ${normalizedEmail}: ${otp}`);
+      console.log("✅ OTP email sent:", result);
+    } catch (mailErr: any) {
+      console.error("❌ Brevo OTP Error FULL:", mailErr);
+      console.error("❌ Brevo OTP Error message:", mailErr?.message);
+      console.error("⚠️ DEV OTP FALLBACK:", otp);
     }
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully.",
+      message: "OTP processed.",
     });
   } catch (error: any) {
     console.error("❌ sendOTP error:", error);
@@ -343,7 +351,7 @@ export const createBooking = async (req: Request, res: Response) => {
           firstName: saved.firstName,
           office: saved.office,
           bookingDate: saved.bookingDate,
-          qrCodeDataURL,
+          qrCodeImageUrl: qrCodeDataURL,
           bookingId: saved._id.toString(),
         }),
         textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
