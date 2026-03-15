@@ -33,75 +33,65 @@ const buildBookingEmailHtml = ({
   firstName,
   office,
   bookingDate,
+  qrCodeDataURL,
   bookingId,
 }: {
   firstName: string;
   office: string;
   bookingDate: string;
+  qrCodeDataURL: string;
   bookingId: string;
 }) => `
-  <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
-    <div style="background: #0038A8; padding: 30px; text-align: center;">
-      <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
-      <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">
-        IoT Visitor Management System
-      </p>
-    </div>
+  <div style="padding: 40px; text-align: center; color: #1e293b;">
+  <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">
+    Hello, ${firstName}!
+  </h2>
 
-    <div style="padding: 40px; text-align: center; color: #1e293b;">
-      <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">
-        Hello, ${firstName}!
-      </h2>
+  <p style="font-size: 15px; color: #475569;">
+    Your appointment for <strong>${office}</strong> is
+    <span style="color: #10b981; font-weight: bold;"> Confirmed</span>.
+  </p>
 
-      <p style="font-size: 15px; color: #475569;">
-        Your appointment for <strong>${office}</strong> is
-        <span style="color: #10b981; font-weight: bold;"> Confirmed</span>.
-      </p>
+  <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
+    <img
+      src="${qrCodeDataURL}"
+      alt="QR Code"
+      style="width: 200px; height: 200px; display: block; border-radius: 10px;"
+    />
 
-      <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
-        <img
-          src="cid:booking-qr-inline.png"
-          alt="QR Code"
-          width="200"
-          height="200"
-          style="width: 200px; height: 200px; display: block; border-radius: 10px; margin: 0 auto;"
-        />
-        <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
-          ID: #${bookingId.slice(-6).toUpperCase()}
-        </p>
-      </div>
+    <p style="margin-top: 15px; font-family: monospace; font-weight: bold; color: #0038A8; font-size: 14px; letter-spacing: 1px;">
+      ID: #${bookingId.slice(-6).toUpperCase()}
+    </p>
 
-      <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
-        Present this QR code at the <strong>Campus Gate</strong> scanner.
-      </p>
-
-      <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
-        <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
-          Valid Date
-        </span>
-        <br />
-        <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
-          ${bookingDate}
-        </span>
-      </div>
-    </div>
-
-    <div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-      <p style="font-size: 11px; color: #64748b; margin: 0;">
-        © ${new Date().getFullYear()} Rizal Technological University Security.
-      </p>
-    </div>
-
-    <div style="padding: 20px; text-align:center;">
-      <p style="font-size:13px; color:#64748b;">
-        Your QR pass is also attached below this email as a PNG file.
-      </p>
-
-      <p style="font-size:12px; color:#94a3b8;">
-        File name: <strong>univentry-qr-${bookingId.slice(-6).toUpperCase()}.png</strong>
-      </p>
-    </div>
+    <a
+      href="${qrCodeDataURL}"
+      download="RTU-QR-${bookingId.slice(-6).toUpperCase()}.png"
+      style="display: inline-block; margin-top: 15px; padding: 10px 18px; background: #0038A8; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 700;"
+    >
+      Download QR Code
+    </a>
   </div>
+
+  <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
+    Present this QR code at the <strong>Campus Gate</strong> scanner.
+  </p>
+
+  <div style="margin-top: 30px; padding: 15px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
+    <span style="font-size: 10px; font-weight: bold; color: #0038A8; text-transform: uppercase; letter-spacing: 1px;">
+      Valid Date
+    </span>
+    <br />
+    <span style="font-size: 16px; font-weight: 800; color: #1e293b;">
+      ${bookingDate}
+    </span>
+  </div>
+</div>
+
+<div style="background: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+  <p style="font-size: 11px; color: #64748b; margin: 0;">
+    © ${new Date().getFullYear()} Rizal Technological University Security.
+  </p>
+</div>
 `;
 
 // 1. SEND OTP
@@ -347,49 +337,27 @@ export const createBooking = async (req: Request, res: Response) => {
 
     const saved = await newBooking.save();
 
-   const qrCodeBuffer = await QRCode.toBuffer(saved._id.toString(), {
-  type: "png",
-  width: 400,
-  margin: 2,
-  errorCorrectionLevel: "H",
-  color: { dark: "#000000", light: "#ffffff" },
-});
+    const qrCodeDataURL = await QRCode.toDataURL(saved._id.toString(), {
+      width: 400,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
 
-const qrCodeBase64 = qrCodeBuffer.toString("base64");
-const shortBookingId = saved._id.toString().slice(-6).toUpperCase();
-
-await sendEmail({
-  to: saved.email,
-  subject: "Appointment Approved - Your Secure Access Pass",
-  htmlContent: buildBookingEmailHtml({
-    firstName: saved.firstName,
-    office: saved.office,
-    bookingDate: saved.bookingDate,
-    bookingId: saved._id.toString(),
-  }),
-  textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Your QR pass is shown in the email and also attached as a PNG file.`,
-  attachments: [
-    {
-      name: "booking-qr-inline.png",
-      content: qrCodeBase64,
-      mimeType: "image/png",
-      isInline: true,
-      inlineId: "booking-qr-inline.png",
-    },
-    {
-      name: `univentry-qr-${shortBookingId}.png`,
-      content: qrCodeBase64,
-      mimeType: "image/png",
-    },
-  ],
-});
+    try {
+      await sendEmail({
+        to: saved.email,
+        subject: "Appointment Approved - Your Secure Access Pass",
+        htmlContent: buildBookingEmailHtml({
+          firstName: saved.firstName,
+          office: saved.office,
+          bookingDate: saved.bookingDate,
+          qrCodeDataURL,
+          bookingId: saved._id.toString(),
+        }),
+        textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
+      });
 
       console.log("✅ Booking QR email sent to:", saved.email);
-      console.log("🖼️ Inline QR attached: booking-qr-inline.png");
-      console.log(
-        "📎 Downloadable QR attached:",
-        `univentry-qr-${shortBookingId}.png`,
-      );
     } catch (mailErr) {
       console.error("⚠️ Booking QR email failed:", mailErr);
     }
