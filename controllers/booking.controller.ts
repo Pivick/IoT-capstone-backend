@@ -65,7 +65,8 @@ const buildBookingEmailHtml = ({
 
     <a
       href="${qrCodeDataURL}"
-      download="RTU-QR-${bookingId.slice(-6).toUpperCase()}.png"
+      target="_blank"
+      rel="noopener noreferrer"
       style="display: inline-block; margin-top: 15px; padding: 10px 18px; background: #0038A8; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 700;"
     >
       Download QR Code
@@ -343,6 +344,12 @@ export const createBooking = async (req: Request, res: Response) => {
       color: { dark: "#000000", light: "#ffffff" },
     });
 
+    const base64QrContent = qrCodeDataURL.split("base64,")[1];
+
+    if (!base64QrContent) {
+      throw new Error("Failed to extract QR code base64 content.");
+    }
+
     try {
       await sendEmail({
         to: saved.email,
@@ -355,6 +362,13 @@ export const createBooking = async (req: Request, res: Response) => {
           bookingId: saved._id.toString(),
         }),
         textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
+        attachments: [
+          {
+            name: `RTU-QR-${saved._id.toString().slice(-6).toUpperCase()}.png`,
+            content: base64QrContent,
+            mimeType: "image/png",
+          },
+        ],
       });
 
       console.log("✅ Booking QR email sent to:", saved.email);
