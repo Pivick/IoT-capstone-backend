@@ -75,7 +75,7 @@ export const buildBookingEmailHtml = ({
 
         
           <div style="border: 4px solid #0038A8; padding: 12px; border-radius: 16px; display: inline-block; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,56,168,0.15);">
-            <img src="cid:qrcode" alt="QR Code" width="160" height="160" style="display: block; border-radius: 8px;" />
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${bookingId}" alt="QR Code" width="160" height="160" style="display: block; border-radius: 8px;" />
           </div>
 
           <p style="color: #0038A8; margin: 0; font-size: 20px; font-family: monospace; font-weight: 900; letter-spacing: 4px;">
@@ -379,19 +379,21 @@ export const createBooking = async (req: Request, res: Response) => {
     try {
       await sendEmail({
         to: saved.email,
-        subject: "Appointment Approved - Your Secure Access Pass",
+        subject: "✅ Clearance Granted - Your Secure Digital Pass",
         htmlContent: buildBookingEmailHtml({
           firstName: saved.firstName,
+          lastName: saved.lastName,
+          category: saved.category,
           office: saved.office,
           bookingDate: saved.bookingDate,
-          qrCodeDataURL,
+          qrCodeDataURL: qrCodeDataURL,
           bookingId: saved._id.toString(),
         }),
         textContent: `Hello ${saved.firstName}, your appointment for ${saved.office} on ${saved.bookingDate} is confirmed. Present your QR pass at the campus gate.`,
         attachments: [
           {
             name: `RTU-QR-${saved._id.toString().slice(-6).toUpperCase()}.png`,
-            content: base64QrContent,
+            content: qrCodeDataURL.split("base64,")[1] || "",
             mimeType: "image/png",
           },
         ],
