@@ -83,9 +83,7 @@ export const buildBookingEmailHtml = ({
           </p>
 
          
-          <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${bookingId}" target="_blank" style="display: inline-block; margin-top: 25px; padding: 12px 24px; background-color: #0038A8; color: #FFD700; text-decoration: none; border-radius: 12px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px;">
-            Download HD Pass
-          </a>
+        
         </td>
       </tr>
 
@@ -98,7 +96,7 @@ export const buildBookingEmailHtml = ({
 
       
       <tr>
-        <td style="background-color: #f8fafc; padding: 25px 30px;">
+        <td style="background-color: #c6c7c9; padding: 25px 30px;">
           <table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td align="left">
