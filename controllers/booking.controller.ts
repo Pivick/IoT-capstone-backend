@@ -53,8 +53,10 @@ const buildBookingEmailHtml = ({
   </p>
 
   <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 20px; background-color: #f8fafc; display: inline-block;">
+    
+    {/* 🚀 FIX 1: Use the public API for the image source instead of Base64 */}
     <img
-      src="${qrCodeDataURL}"
+      src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${bookingId}"
       alt="QR Code"
       style="width: 200px; height: 200px; display: block; border-radius: 10px;"
     />
@@ -63,13 +65,14 @@ const buildBookingEmailHtml = ({
       ID: #${bookingId.slice(-6).toUpperCase()}
     </p>
 
+    {/* 🚀 FIX 2: Point the download button to a high-res version of the public link */}
     <a
-      href="${qrCodeDataURL}"
+      href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${bookingId}"
       target="_blank"
       rel="noopener noreferrer"
       style="display: inline-block; margin-top: 15px; padding: 10px 18px; background: #0038A8; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 700;"
     >
-      Download QR Code
+      View Full Size QR
     </a>
   </div>
 
