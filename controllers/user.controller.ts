@@ -11,83 +11,80 @@ const verifiedResetSessions = new Set<string>();
 // =========================================================
 // 1. CREATE USER (SIGNUP) - WITH BREVO EMAIL & SECURITY
 // =========================================================
-
 export const createUser = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, office } = req.body; // Added office just in case
 
     const creatorRole = (req as any).user?.role;
 
     if (role === "super-admin" && creatorRole !== "super-admin") {
-      return res.status(403).json({
-        message:
-          "Access Denied: Only Super Admins can create Super Admin accounts.",
-      });
+      return res.status(403).json({ message: "Access Denied." });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ message: "Email already in use." });
     }
 
+    // 1. Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // 2. Save to Database
     const newUser = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       role,
+      office: role === "office" ? office : "System",
     });
 
+    // 3. Prepare HTML (Using the PLAIN text 'password' variable)
     const emailHtml = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden;">
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 20px; overflow: hidden;">
         <div style="background: #0038A8; padding: 30px; text-align: center;">
-          <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
-          <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">System Access Granted</p>
+          <h1 style="color: #FFD700; margin: 0;">UNIVENTRY</h1>
         </div>
-        <div style="padding: 40px; text-align: left; color: #1e293b;">
-          <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">Hello, ${name}!</h2>
-          <p style="font-size: 15px; color: #475569;">An administrator has successfully provisioned your account for the UniVentry System.</p>
-          
-          <div style="margin: 30px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 15px; background-color: #f8fafc;">
-            <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Your Credentials</p>
-            <p style="margin: 5px 0;"><strong>Role Clearance:</strong> <span style="color: #0038A8; background: #eff6ff; padding: 2px 8px; border-radius: 4px;">${role.toUpperCase()}</span></p>
-            <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px;">${password}</span></p>
+        <div style="padding: 40px; color: #1e293b;">
+          <h2 style="color: #0038A8;">Hello, ${name}!</h2>
+          <p>Your account has been provisioned. Use the credentials below to log in:</p>
+          <div style="margin: 20px 0; padding: 20px; background-color: #f8fafc; border-radius: 10px;">
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> <span style="font-family: monospace;">${password}</span></p>
+            <p><strong>Clearance:</strong> ${role.toUpperCase()}</p>
           </div>
-          
-          <p style="font-size: 14px; color: #dc2626; font-weight: bold;">⚠️ Security Notice: Please log in immediately and change your password.</p>
+          <p style="color: #dc2626; font-size: 12px;">Please change your password immediately after logging in.</p>
         </div>
       </div>
     `;
 
-    // 🔥 FIX: Added 'await' and strict error logging so we know exactly why Brevo isn't sending it.
+    // 4. 🔥 THE FIX: ADD 'await' HERE
+    // We wait for Brevo to confirm receipt before telling the Admin "User Created"
     try {
-      console.log(`[BREVO] Attempting to send credentials to ${email}...`);
       await sendEmail({
         to: email,
         subject: "🔑 Your UniVentry System Credentials",
         htmlContent: emailHtml,
       });
-      console.log(`[BREVO] Success! Email delivered to ${email}`);
-    } catch (mailErr: any) {
-      console.error(
-        "⚠️ Brevo Email Failed to Send! Reason:",
-        mailErr.response?.body || mailErr.message || mailErr,
-      );
+      console.log(`✅ Credentials transmitted to ${email}`);
+    } catch (emailErr) {
+      console.error("❌ Brevo Failed during User Creation:", emailErr);
+      // We still return 201 because the user WAS created in DB, but we log the error
     }
 
     return res.status(201).json({
       success: true,
-      message: "Personnel registered successfully.",
-      user: newUser,
+      message: "Personnel registered successfully and credentials emailed.",
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      },
     });
   } catch (error: any) {
     console.error("Create User Error:", error);
-    return res
-      .status(500)
-      .json({ message: "Server error during registration." });
+    return res.status(500).json({ message: "Server error." });
   }
 };
 
