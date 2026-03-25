@@ -1,6 +1,11 @@
 /* eslint-disable */
 import express, { Request, Response } from "express";
-import { updateEmail, updateOffice } from "../controllers/user.controller";
+import {
+  changePassword,
+  updateEmail,
+  updateOffice,
+  updateProfile,
+} from "../controllers/user.controller";
 import User from "../model/user"; // Make sure this matches your actual filename (e.g., user.model or user)
 
 const router = express.Router();
@@ -29,6 +34,9 @@ router.get("/", async (req: Request, res: Response) => {
 // ==========================================================
 router.patch("/:id/email", updateEmail);
 router.patch("/:id/office", updateOffice);
+
+router.put("/update-profile", updateProfile);
+router.put("/change-password", changePassword);
 
 // ==========================================================
 // 3. UPDATE ROLE

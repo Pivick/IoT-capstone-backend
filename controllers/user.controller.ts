@@ -208,3 +208,79 @@ export const resetPassword = async (
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
+export const updateProfile = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
+  try {
+    const { userId, name, email } = req.body;
+
+    // 1. Check if another user already has this email
+    const emailExists = await User.findOne({ email, _id: { $ne: userId } });
+    if (emailExists) {
+      return res
+        .status(400)
+        .json({ message: "This email is already in use by another account." });
+    }
+
+    // 2. Update the user
+    // (If your DB uses firstName/lastName instead of 'name', split it here)
+    const nameParts = name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { name, firstName, lastName, email },
+      { new: true },
+    ).select("-password"); // Don't send the password back!
+
+    if (!updatedUser)
+      return res.status(404).json({ message: "User not found." });
+
+    return res
+      .status(200)
+      .json({ message: "Profile updated successfully.", user: updatedUser });
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// ---------------------------------------------------------
+// CHANGE PASSWORD
+// ---------------------------------------------------------
+export const changePassword = async (
+  req: Request,
+  res: Response,
+): Promise<any> => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+
+    // 1. Find user and get their current encrypted password
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    // 2. Verify the current password matches
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid current passcode." });
+    }
+
+    // 3. Encrypt the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 4. Save to DB
+    user.password = hashedPassword;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ message: "Security key overridden successfully." });
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
