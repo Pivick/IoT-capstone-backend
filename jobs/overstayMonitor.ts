@@ -14,7 +14,7 @@ const startOverstayMonitor = () => {
     try {
       const now = new Date();
       // Logic: 30 minutes ago
-      const timeLimit = new Date(now.getTime() - 30 * 60 * 1000);
+      const timeLimit = new Date(now.getTime() - 1 * 60 * 1000);
 
       // 1. Initial Find
       // Find visitors who finished transaction >30 mins ago AND haven't been warned
