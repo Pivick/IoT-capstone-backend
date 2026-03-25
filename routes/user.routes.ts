@@ -1,8 +1,13 @@
+/* eslint-disable */
 import express, { Request, Response } from "express";
-import User from "../model/user";
+import { updateEmail, updateOffice } from "../controllers/user.controller";
+import User from "../model/user"; // Make sure this matches your actual filename (e.g., user.model or user)
 
 const router = express.Router();
 
+// ==========================================================
+// 1. GET ALL USERS
+// ==========================================================
 /**
  * @route   GET /api/users
  * @desc    Get all staff members for the management list
@@ -10,9 +15,8 @@ const router = express.Router();
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
-    // We sort by newest first and hide passwords
+    // Sort by newest first and hide passwords for security
     const users = await User.find().select("-password").sort({ createdAt: -1 });
-
     res.status(200).json(users);
   } catch (err) {
     console.error("Fetch Users Error:", err);
@@ -20,16 +24,25 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
+// ==========================================================
+// 2. UPDATE EMAIL & OFFICE (From Controller)
+// ==========================================================
+router.patch("/:id/email", updateEmail);
+router.patch("/:id/office", updateOffice);
+
+// ==========================================================
+// 3. UPDATE ROLE
+// ==========================================================
 /**
  * @route   PATCH /api/users/:id/role
- * @desc    Update a staff member's role (Admin, Guard, Office, Super-Admin)
+ * @desc    Update a staff member's role
  * @access  Private (Admin Only)
  */
 router.patch("/:id/role", async (req: Request, res: Response) => {
   const { role } = req.body;
   const { id } = req.params;
 
-  // 1. Validate that the role is allowed based on your model enum
+  // Validate that the role is allowed based on your model enum
   const validRoles = ["admin", "guard", "office", "super-admin"];
   if (!validRoles.includes(role)) {
     return res.status(400).json({ message: "Invalid role assignment" });
@@ -56,6 +69,9 @@ router.patch("/:id/role", async (req: Request, res: Response) => {
   }
 });
 
+// ==========================================================
+// 4. DELETE USER
+// ==========================================================
 /**
  * @route   DELETE /api/users/:id
  * @desc    Remove a staff account from the system
