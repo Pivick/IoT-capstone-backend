@@ -318,9 +318,9 @@ export const forgotPassword = async (
 
     const htmlContent = `
       <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background-color: #ffffff;">
-        <div style="background: #001233; padding: 30px; text-align: center; border-bottom: 4px solid #FFD700;">
+        <div style="background: #0038A8; padding: 30px; text-align: center; border-bottom: 4px solid #FFD700;">
           <h1 style="color: #FFD700; margin: 0; letter-spacing: 2px; font-size: 28px; font-weight: 900;">UNIVENTRY</h1>
-          <p style="color: #60a5fa; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">Security Command Node</p>
+          <p style="color: #ffffff; margin: 5px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">Security Command Node</p>
         </div>
         <div style="padding: 40px; text-align: center; color: #1e293b;">
           <h2 style="color: #0038A8; font-size: 22px; margin-bottom: 10px; font-weight: 800;">Access Recovery Protocol</h2>
