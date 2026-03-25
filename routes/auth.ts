@@ -2,6 +2,7 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import {
+  createUser,
   forgotPassword,
   resetPassword,
   verifyResetOTP,
@@ -114,7 +115,7 @@ const handleSignup = async (req: express.Request, res: express.Response) => {
   }
 };
 
-router.post("/signup", handleSignup);
+router.post("/signup", createUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-otp", verifyResetOTP);
 router.post("/reset-password", resetPassword);
