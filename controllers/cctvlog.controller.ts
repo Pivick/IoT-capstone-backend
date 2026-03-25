@@ -63,3 +63,22 @@ export const getLogsByVisitor = async (
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const deleteLog = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const deletedLog = await CCTVLog.findByIdAndDelete(id);
+
+    if (!deletedLog) {
+      return res.status(404).json({ message: "Surveillance log not found." });
+    }
+
+    res.status(200).json({ message: "Log entry erased successfully." });
+  } catch (error: any) {
+    console.error("🔥 CCTV DELETE ERROR:", error.message);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
