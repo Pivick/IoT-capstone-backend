@@ -70,7 +70,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
       to: email,
       subject: "🔑 Your UniVentry System Credentials",
       htmlContent: emailHtml,
-    }).catch((err: any) => console.error("⚠️ Brevo Email Warning:", err));
+    });
 
     return res.status(201).json({
       success: true,
