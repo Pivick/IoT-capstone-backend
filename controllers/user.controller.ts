@@ -86,24 +86,52 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
 };
 
 // =========================================================
-// 2. DELETE USER - WITH SUPER ADMIN SECURITY LOCK
+// 2. DELETE USER - WITH SUPER ADMIN SECURITY LOCK & PASSWORD
 // =========================================================
 export const deleteUser = async (req: Request, res: Response): Promise<any> => {
   try {
-    const targetUser = await User.findById(req.params.id);
+    const { id } = req.params; // The user to delete
+    const { password } = req.body; // The password the admin typed in the modal
+
+    // Get the currently logged-in Admin's ID and Role from the JWT middleware
+    const requesterId = (req as any).user?._id;
     const requesterRole = (req as any).user?.role;
 
+    // 1. Password Presence Check
+    if (!password) {
+      return res
+        .status(400)
+        .json({ message: "Admin password is required to verify deletion." });
+    }
+
+    // 2. Find the target user
+    const targetUser = await User.findById(id);
     if (!targetUser) return res.status(404).json({ message: "User not found" });
 
-    // 🔒 SECURITY CHECK: Admins cannot delete Super Admins
+    // 3. 🔒 SECURITY CHECK: Admins cannot delete Super Admins
     if (targetUser.role === "super-admin" && requesterRole !== "super-admin") {
       return res.status(403).json({
         message: "Clearance Denied: Cannot purge a Super Admin account.",
       });
     }
 
-    await User.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ message: "User deleted successfully." });
+    // 4. Fetch the Admin from the database to check their password
+    const adminUser = await User.findById(requesterId);
+    if (!adminUser) {
+      return res.status(404).json({ message: "Admin session not found." });
+    }
+
+    // 5. 🔒 SECURITY CHECK: Verify the password typed matches the Admin's actual password
+    const isMatch = await bcrypt.compare(password, adminUser.password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ message: "Incorrect admin password. Deletion denied." });
+    }
+
+    // 6. Clearance granted! Delete the target user.
+    await User.findByIdAndDelete(id);
+    return res.status(200).json({ message: "User securely erased." });
   } catch (error) {
     console.error("Delete User Error:", error);
     return res.status(500).json({ message: "Failed to delete user." });
