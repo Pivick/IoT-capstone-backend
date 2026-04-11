@@ -7,7 +7,9 @@ router.get("/face-recognition/visitors", async (_req, res) => {
   try {
     const visitors = await Booking.find({
       faceEmbedding: { $exists: true, $ne: null },
-    }).select("_id firstName lastName faceEmbedding status");
+    }).select(
+      "_id firstName lastName faceEmbedding status bookingDate office timeIn",
+    ); // Added office and timeIn
 
     return res.status(200).json({
       success: true,
